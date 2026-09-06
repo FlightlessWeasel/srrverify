@@ -1,5 +1,6 @@
 """Library CRUD and the scan-results query."""
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -8,6 +9,7 @@ from pydantic import BaseModel
 
 from ..config import API_PREFIX
 from ..db import get_conn, utcnow
+from ..status import Status
 
 router = APIRouter(prefix=API_PREFIX)
 
@@ -82,11 +84,71 @@ def library_summary(library_id: int) -> dict:
     return summary(library_id)
 
 
+@dataclass
+class _ReleaseAgg:
+    """Per-folder tally built up from the grouped file rows."""
+
+    release: str
+    resolved_name: Optional[str]
+    found: bool
+    counts: dict = field(default_factory=dict)
+
+    def as_dict(self) -> dict:
+        total = sum(self.counts.values())
+        matched = self.counts.get(Status.MATCH.value, 0)
+        return {
+            "release": self.release,
+            "resolved_name": self.resolved_name,
+            "found": self.found,
+            "total": total,
+            "counts": self.counts,
+            "match_pct": round(matched / total * 100) if total else 0,
+        }
+
+
+@router.get("/libraries/{library_id}/releases")
+def library_releases(library_id: int) -> list[dict]:
+    """One row per game folder, with its per-status counts and srrdb link.
+
+    `release` is the on-disk folder name; `resolved_name` is what srrdb.com
+    actually calls the release (may differ) and drives the external link.
+    """
+    conn = get_conn()
+    # resolved_name / found are the same for every row of a folder (the join key
+    # is the folder name), so MAX() just carries that one value per group.
+    rows = conn.execute(
+        "SELECT f.release, f.status, COUNT(*) count, "
+        "       MAX(r.resolved_name) resolved_name, MAX(r.found) found "
+        "FROM files f LEFT JOIN releases r ON r.name = f.release "
+        "WHERE f.library_id=? "
+        "GROUP BY f.release, f.status",
+        (library_id,),
+    ).fetchall()
+
+    aggs: dict[str, _ReleaseAgg] = {}
+    for r in rows:
+        agg = aggs.get(r["release"])
+        if agg is None:
+            agg = _ReleaseAgg(
+                release=r["release"],
+                resolved_name=r["resolved_name"],
+                found=bool(r["found"]),
+            )
+            aggs[r["release"]] = agg
+        agg.counts[r["status"]] = r["count"]
+
+    return [
+        a.as_dict()
+        for a in sorted(aggs.values(), key=lambda a: a.release.lower())
+    ]
+
+
 @router.get("/libraries/{library_id}/files")
 def library_files(
     library_id: int,
     status: Optional[str] = None,
     search: Optional[str] = None,
+    release: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> dict:
@@ -96,6 +158,9 @@ def library_files(
     if status and status != "ALL":
         where.append("status=?")
         params.append(status)
+    if release:
+        where.append("release=?")
+        params.append(release)
     if search:
         where.append("(rel_path LIKE ? OR release LIKE ?)")
         params += [f"%{search}%", f"%{search}%"]

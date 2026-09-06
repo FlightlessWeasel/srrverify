@@ -3,6 +3,7 @@ import { api, Library, ScanState, token } from "./api";
 import { fmtSize } from "./format";
 import { DirectoryPicker } from "./components/DirectoryPicker";
 import { Login } from "./components/Login";
+import { ReleaseList } from "./components/ReleaseList";
 import { Results } from "./components/Results";
 import { UpdatePanel } from "./components/UpdatePanel";
 
@@ -17,6 +18,7 @@ export default function App() {
   const [scanRunning, setScanRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [releaseFilter, setReleaseFilter] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
   const checkAuth = useCallback(async () => {
@@ -55,6 +57,9 @@ export default function App() {
   useEffect(() => {
     if (gate === "ok") loadLibraries();
   }, [gate, loadLibraries]);
+
+  // A different library has its own folders; drop any active folder filter.
+  useEffect(() => setReleaseFilter(null), [activeId]);
 
   const poll = useCallback(async () => {
     try {
@@ -225,7 +230,25 @@ export default function App() {
         </section>
       )}
 
-      {active && <Results libraryId={active.id} refreshKey={refreshKey} />}
+      {active && (
+        <ReleaseList
+          libraryId={active.id}
+          refreshKey={refreshKey}
+          selected={releaseFilter}
+          onSelect={(r) =>
+            setReleaseFilter((cur) => (cur === r ? null : r))
+          }
+        />
+      )}
+
+      {active && (
+        <Results
+          libraryId={active.id}
+          refreshKey={refreshKey}
+          release={releaseFilter}
+          onClearRelease={() => setReleaseFilter(null)}
+        />
+      )}
 
       {picking && (
         <DirectoryPicker

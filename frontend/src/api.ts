@@ -35,6 +35,15 @@ export interface FileRow {
   scanned_at: string | null;
 }
 
+export interface ReleaseRow {
+  release: string;
+  resolved_name: string | null;
+  found: boolean;
+  total: number;
+  counts: Record<string, number>;
+  match_pct: number;
+}
+
 export interface ScanState {
   library_id: number;
   phase: string;
@@ -134,13 +143,22 @@ export const api = {
     }),
   deleteLibrary: (id: number) =>
     request<void>(`/api/libraries/${id}`, { method: "DELETE" }),
+  releases: (id: number) =>
+    request<ReleaseRow[]>(`/api/libraries/${id}/releases`),
   files: (
     id: number,
-    opts: { status?: string; search?: string; limit?: number; offset?: number }
+    opts: {
+      status?: string;
+      search?: string;
+      release?: string;
+      limit?: number;
+      offset?: number;
+    }
   ) => {
     const p = new URLSearchParams();
     if (opts.status) p.set("status", opts.status);
     if (opts.search) p.set("search", opts.search);
+    if (opts.release) p.set("release", opts.release);
     if (opts.limit) p.set("limit", String(opts.limit));
     if (opts.offset) p.set("offset", String(opts.offset));
     return request<{ total: number; items: FileRow[] }>(

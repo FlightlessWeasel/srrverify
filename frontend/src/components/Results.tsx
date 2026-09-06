@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, FileRow, FileStatus } from "../api";
 import { fmtSize } from "../format";
 
@@ -14,9 +14,13 @@ const PAGE = 200;
 export function Results({
   libraryId,
   refreshKey,
+  release,
+  onClearRelease,
 }: {
   libraryId: number;
   refreshKey: number;
+  release?: string | null;
+  onClearRelease?: () => void;
 }) {
   const [status, setStatus] = useState<string>("ALL");
   const [search, setSearch] = useState("");
@@ -27,13 +31,19 @@ export function Results({
     items: [],
   });
   const [loading, setLoading] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => setPage(0), [status, debounced, libraryId]);
+  useEffect(() => setPage(0), [status, debounced, libraryId, release]);
+
+  // Picking a folder up in the list scrolls its file rows into view.
+  useEffect(() => {
+    if (release) rootRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [release]);
 
   useEffect(() => {
     setLoading(true);
@@ -41,17 +51,28 @@ export function Results({
       .files(libraryId, {
         status,
         search: debounced,
+        release: release ?? undefined,
         limit: PAGE,
         offset: page * PAGE,
       })
       .then(setData)
       .finally(() => setLoading(false));
-  }, [libraryId, status, debounced, page, refreshKey]);
+  }, [libraryId, status, debounced, release, page, refreshKey]);
 
   const pages = Math.max(1, Math.ceil(data.total / PAGE));
 
   return (
-    <div className="results">
+    <div className="results" ref={rootRef}>
+      {release && (
+        <div className="filter-note">
+          <span>
+            Folder: <strong>{release}</strong>
+          </span>
+          <button className="link" onClick={onClearRelease}>
+            clear
+          </button>
+        </div>
+      )}
       <div className="results-controls">
         <div className="tabs">
           {STATUS_TABS.map((s) => (

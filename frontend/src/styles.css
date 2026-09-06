@@ -260,6 +260,48 @@ input {
   text-overflow: ellipsis;
 }
 
+.release-list {
+  margin-top: 20px;
+}
+.release-list h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+tr.release-row {
+  cursor: pointer;
+}
+tr.release-row.selected {
+  background: var(--panel-2);
+}
+tr.release-row td.path {
+  max-width: 420px;
+}
+.match-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+}
+.bar.mini {
+  width: 120px;
+  flex: none;
+}
+.bar-fill.full {
+  background: var(--match);
+}
+.bar-fill.partial {
+  background: var(--mismatch);
+}
+
+.filter-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .results {
   margin-top: 20px;
 }
