@@ -1,19 +1,15 @@
 import { useEffect, useState } from "react";
-import { api, FileRow } from "../api";
+import { api, FileRow, FileStatus } from "../api";
+import { fmtSize } from "../format";
 
-const STATUS_TABS = ["ALL", "MISMATCH", "NOT_FOUND", "ERROR", "MATCH"] as const;
+const STATUS_TABS: ("ALL" | FileStatus)[] = [
+  "ALL",
+  "MISMATCH",
+  "NOT_FOUND",
+  "ERROR",
+  "MATCH",
+];
 const PAGE = 200;
-
-function fmtSize(n: number): string {
-  const u = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < u.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
-}
 
 export function Results({
   libraryId,

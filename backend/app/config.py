@@ -9,5 +9,8 @@ DB_PATH = DATA_DIR / "gamecrc.db"
 # Frontend build output, served by FastAPI when present.
 FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
 
+# All HTTP API routes live under this prefix; everything else is the SPA.
+API_PREFIX = "/api"
+
 # srrdb is polite about request rate; keep lookups serialized-ish.
 SRRDB_TIMEOUT = 60.0

@@ -1,8 +1,11 @@
 # srrverify — specification
 
-Reverse-engineered from the code at `b68cb2f`. No spec predated it; this is the
-reference for what the app is meant to do, so future changes can be checked
-against intent rather than against the current implementation alone.
+Reverse-engineered from the code at `b68cb2f`, then updated after the first
+review pass landed its fixes. No spec predated the code; this is the reference
+for what the app is meant to do, so future changes can be checked against intent
+rather than against the current implementation alone.
+
+**Target platform: headless Linux only.** No Windows or macOS support.
 
 ## Purpose
 
@@ -44,12 +47,11 @@ check. It is kept as-is; the web app is the maintained implementation.
 
 ### Filesystem browser
 
-4. `GET /api/fs/list` with no `path` returns the roots: drive letters that exist
-   on Windows, `/` elsewhere.
+4. `GET /api/fs/list` with no `path` returns the single root `/`.
 5. With a `path`, return that directory's immediate subdirectories (sorted
    case-insensitively) plus its parent, or a 404 if it is not a directory, or a
    403 if it cannot be read. This endpoint only ever exposes directory names, no
-   file contents.
+   file contents. Error responses do not echo the requested path.
 
 ### Scanning
 
@@ -95,13 +97,16 @@ check. It is kept as-is; the web app is the maintained implementation.
 ### Scan progress and control
 
 17. `GET /api/scan/current` returns whether a scan is running and, if state
-    exists, a snapshot: library id, phase, file counts, byte counts, current
+    exists, a snapshot: library id, phase, a display label for the phase
+    (`phase_label`, computed server-side), file counts, byte counts, current
     file, message, and per-status counts.
-18. `POST /api/scan/cancel` requests cancellation. The running scan stops at the
-    next file boundary or chunk boundary, commits what it has, and ends in phase
-    `cancelled`.
-19. Any unexpected exception during a scan ends it in phase `error` with the
-    exception type and message in the snapshot; the process keeps serving.
+18. `POST /api/scan/cancel` requests cancellation of the scan that is current at
+    that moment. The running scan stops at the next file boundary or chunk
+    boundary, commits what it has, and ends in phase `cancelled`. A cancel
+    request carries no effect onto a later scan (per-run token).
+19. Any unexpected exception during a scan ends it in phase `error`. The snapshot
+    message names the exception class only; the full exception is written to the
+    server log and to the `scans` row. The process keeps serving.
 
 ### Results
 
@@ -125,8 +130,12 @@ check. It is kept as-is; the web app is the maintained implementation.
 23. Login requires username + password + current 6-digit TOTP code. Password
     hashing is scrypt; TOTP is RFC 6238 (SHA-1, 6 digits, 30 s, ±1 step window).
     A TOTP counter value cannot be reused (in-process replay guard).
-24. Five failed attempts from one client key within 300 s block further attempts
-    for the rest of that window. A success clears the counter.
+24. Five failed attempts within 300 s block further attempts for the rest of that
+    window. Two independent counters are kept: one per source address, one per
+    username. A success clears both. The source address is `request.client.host`,
+    or the first `X-Forwarded-For` hop when `GAMECRC_TRUST_PROXY` is set.
+    A wrong username costs the same time as a wrong password (constant-work
+    hash), so response timing does not reveal whether the username exists.
 25. Tokens are stateless: base64url JSON `{u, exp}` plus an HMAC-SHA256 signature
     over `server_secret`. TTL 12 h. The only revocation is rotating
     `server_secret`. The browser stores the token in `localStorage`.
@@ -165,15 +174,27 @@ check. It is kept as-is; the web app is the maintained implementation.
 
 ## Known gaps / accepted limitations
 
-Tracked from the `b68cb2f` review; see repo issues for status.
+Fixed after the `b68cb2f` review:
 
-- SPA catch-all route does not confine served paths to `frontend/dist/`
-  (path-traversal file read). **Must fix before any non-loopback exposure.**
-- Default bind is all interfaces with auth off.
-- `chmod(0o600)` on `auth.json` does not restrict access on Windows.
-- No UNC-path rejection when adding a library.
-- Login throttle is per-client-key only, with no `X-Forwarded-For` handling and
-  no per-username limit.
-- The "one scan at a time" guard is not race-safe if an `await` is later added
-  before `create_task`; cancellation has no per-run token.
+- SPA catch-all now resolves each candidate and refuses anything outside
+  `frontend/dist/`; traversal attempts fall through to `index.html`.
+- `auth.json` is created `0600` (open flag) and re-`chmod`ed on every write.
+- Login throttle keys on source address *and* username; honours
+  `X-Forwarded-For` under `GAMECRC_TRUST_PROXY`.
+- Constant-work password hash removes the username-enumeration timing signal.
+- Scan start takes an `asyncio.Lock`; cancellation is scoped by a per-run token.
+- Filesystem-browser and scan errors no longer echo absolute paths or raw
+  exception text to the client.
+
+Accepted, by decision:
+
+- Default bind is `0.0.0.0` with auth off. The app is for a trusted LAN and is
+  not to be exposed to the internet. Turn auth on before widening exposure.
+- No UNC / SMB-path guard on library add — not relevant on the Linux target.
+
+Still open:
+
 - No automated tests.
+- `_discover` holds one record per file in memory before hashing; very large
+  trees spike RAM.
+- Stateless tokens have no revocation short of rotating `server_secret`.

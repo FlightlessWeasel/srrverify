@@ -13,6 +13,16 @@ export interface LibrarySummary {
   last_scan: { finished_at: string; state: string } | null;
 }
 
+/** Mirror of backend/app/status.py `Status`. Keep in sync. */
+export const FILE_STATUSES = [
+  "MATCH",
+  "MISMATCH",
+  "NOT_FOUND",
+  "ERROR",
+  "PENDING",
+] as const;
+export type FileStatus = (typeof FILE_STATUSES)[number];
+
 export interface FileRow {
   id: number;
   rel_path: string;
@@ -21,13 +31,15 @@ export interface FileRow {
   size: number;
   crc32: string | null;
   expected_crc: string | null;
-  status: "MATCH" | "MISMATCH" | "NOT_FOUND" | "ERROR" | "PENDING";
+  status: FileStatus;
   scanned_at: string | null;
 }
 
 export interface ScanState {
   library_id: number;
   phase: string;
+  /** Display string for `phase`, supplied by the server. */
+  phase_label: string;
   files_total: number;
   files_done: number;
   bytes_total: number;

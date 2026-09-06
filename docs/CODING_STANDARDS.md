@@ -20,11 +20,13 @@ and the exceptions are debt (see the end).
 ### Module layout
 
 - One responsibility per module: `crc` (hashing), `srrdb` (API client + parse),
-  `db` (connection + schema), `scanner` (scan orchestration), `auth`
-  (auth primitives), `auth_setup` (CLI), `main` (HTTP). `config` holds paths and
-  constants read from the environment at import time.
-- `main.py` is the exception and is over-broad — see debt. New HTTP surface goes
-  in an `APIRouter` module under `routers/`, not appended to `main.py`.
+  `db` (connection + schema), `scanner` (scan orchestration), `status` (the file
+  status / scan phase vocabulary), `auth` (auth primitives), `auth_setup` (CLI).
+  `config` holds paths and constants read from the environment at import time.
+- HTTP routes live in `app/routers/` — one module per resource group (`auth`,
+  `fs`, `libraries`, `scan`), each exporting an `APIRouter`. `main.py` only
+  builds the app, installs the auth middleware, wires the routers, and serves
+  the built SPA. New endpoints go in a router module, never in `main.py`.
 
 ### SQL and the database
 
@@ -41,14 +43,13 @@ and the exceptions are debt (see the end).
 
 ### State and types
 
-- Mutable run state is a `@dataclass` with `field(default_factory=...)` for
-  containers and an explicit `as_dict()` for the JSON shape (`ScanState`). New
-  structured state follows this — do **not** thread bare dicts with
-  `d["key"]` access (`_discover`'s `item` is existing debt).
+- Structured data is a `@dataclass`, not a bare dict threaded by `d["key"]`
+  (`DiscoveredFile`, `ScanState`). Use `field(default_factory=...)` for
+  containers and an explicit `as_dict()` where a specific JSON shape is sent.
 - Type-hint public functions and dataclass fields. `Optional[X]` for nullable.
-- Domain enumerations (file status, scan phase) are module-level constants, not
-  bare string literals at each use site. There must be exactly one definition
-  per language. See "Shared vocabulary" below.
+- Domain enumerations live in `status.py` as `str`-mixin `Enum`s (`Status`,
+  `Phase`). Pass `.value` when handing one to sqlite or into a JSON dict.
+  Nothing else redefines these strings — see "Shared vocabulary" below.
 
 ### Errors
 
@@ -99,17 +100,18 @@ and the exceptions are debt (see the end).
 ## Shared vocabulary (backend ↔ frontend ↔ script)
 
 File-status values (`MATCH`, `MISMATCH`, `NOT_FOUND`, `ERROR`, `PENDING`) and
-scan-phase values appear in Python, in the `api.ts` union, in `Results.tsx`
-tabs, in `App.tsx`'s `phaseLabel`, in `styles.css` class names, and in
-`crc32-iso.sh`. They are a single contract. When you change the set:
+scan-phase values are a single contract with four holders:
 
-1. Update the backend constants (the source of truth).
-2. Update the `api.ts` union and any switch/label/tab list that enumerates them.
-3. Update `styles.css` and `crc32-iso.sh` if the changed value is styled or
-   printed there.
+1. `backend/app/status.py` — the source of truth (`Status`, `Phase`,
+   `PHASE_LABELS`).
+2. `frontend/src/api.ts` — `FILE_STATUSES` / `FileStatus`. Mirror by hand.
+3. `frontend/src/styles.css` — class names per status/badge.
+4. `crc32-iso.sh` — its own copy; frozen.
 
-Prefer moving display strings to the server (send the label, not just the
-phase) so the client stops re-deriving them.
+Phase *display strings* are computed on the server (`phase_label` in the scan
+snapshot); the client renders that string and does not re-derive it. Do the
+same for any new phase-driven text. `db.SCHEMA` hard-codes `DEFAULT 'PENDING'`
+in DDL — that one is left as a literal on purpose.
 
 ## `crc32-iso.sh`
 
@@ -132,14 +134,19 @@ None exists. New non-trivial backend logic (`srrdb` parsing, `scanner`
 evaluation, `auth` token/TOTP) should land with `pytest` cases. Set up the test
 runner in the PR that adds the first test.
 
-## Known debt (from the `b68cb2f` review)
+## Debt cleared in the `b68cb2f` review
 
-- Status/phase strings duplicated across ~8 files instead of one constant per
-  language.
-- `fmtSize` copied verbatim in `App.tsx` and `Results.tsx`.
-- `main.py` owns auth, fs browsing, library CRUD, scan control, and static
-  serving in one 295-line module.
-- `_discover` yields untyped dicts threaded through the scan by `item["key"]`.
-- Bearer-header parsing and the `/api/` prefix check are reimplemented several
-  times in `main.py`.
-- `_summary` computes `SUM(size)` it never returns.
+For reference — these were fixed, don't reintroduce the pattern:
+
+- Status/phase strings centralised (`status.py`, `api.ts` `FILE_STATUSES`).
+- `fmtSize` extracted to `frontend/src/format.ts`.
+- `main.py` split into `app/routers/`.
+- `_discover` returns `DiscoveredFile` dataclasses.
+- One `auth.bearer_from_header()` helper; one `API_PREFIX` constant.
+- `summary()` no longer computes an unused `SUM(size)`.
+
+## Still open
+
+- No automated tests (see above).
+- `_discover` builds the full file list in memory before hashing.
+- `crc32-iso.sh` still duplicates `crc32_file` / `parse_expected_crc` — frozen.

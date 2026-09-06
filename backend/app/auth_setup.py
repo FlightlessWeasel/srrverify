@@ -1,4 +1,4 @@
-"""Configure authentication for Game CRC Checker.
+"""Configure authentication for srrverify.
 
     python -m app.auth_setup            # enable / re-enroll (prompts)
     python -m app.auth_setup --show     # print the current otpauth URI + QR
@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> None:
     except Exception:  # noqa: BLE001
         pass
 
-    parser = argparse.ArgumentParser(description="Configure Game CRC Checker auth")
+    parser = argparse.ArgumentParser(description="Configure srrverify auth")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--disable", action="store_true", help="turn auth off")
     group.add_argument("--show", action="store_true", help="show current MFA enrollment")

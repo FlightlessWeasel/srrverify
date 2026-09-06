@@ -27,7 +27,7 @@ export function Login({ onDone }: { onDone: () => void }) {
   return (
     <div className="login-wrap">
       <form className="login" onSubmit={submit}>
-        <h1>Game CRC Checker</h1>
+        <h1>srrverify</h1>
         <p className="muted">Sign in with your password and authenticator code.</p>
 
         <label>

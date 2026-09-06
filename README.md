@@ -1,4 +1,4 @@
-# Game CRC Checker
+# srrverify
 
 Web app that scans a library folder, computes CRC32 for every file, and checks
 each one against the CRC records on [srrdb.com](https://www.srrdb.com). Results
@@ -6,6 +6,10 @@ are cached in a local SQLite database so a folder is only hashed once.
 
 Built around `crc32-iso.sh`, which does the same check for `.iso` files from the
 command line.
+
+**Target: headless Linux.** The backend paths, the folder picker (single `/`
+root), and `crc32-iso.sh` assume Linux. It is meant to run on a LAN host, not to
+be exposed to the internet.
 
 ## How it works
 
@@ -23,7 +27,7 @@ command line.
 ## Layout
 
 ```
-backend/   FastAPI + SQLite. Scanning, CRC, srrdb client.
+backend/   FastAPI + SQLite. Scanning, CRC, srrdb client. HTTP routes in app/routers/.
 frontend/  React + Vite. Library manager, folder picker, progress, results table.
 ```
 
@@ -34,7 +38,7 @@ frontend/  React + Vite. Library manager, folder picker, progress, results table
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate        # Windows;  source .venv/bin/activate on macOS/Linux
+source .venv/bin/activate
 pip install -r requirements.txt
 python run.py                  # serves http://0.0.0.0:8000 (all interfaces)
 ```
@@ -61,8 +65,9 @@ reaching the app from another machine.
 ## Authentication (optional, with MFA)
 
 Auth is **off by default** — the app serves with no login. Because `run.py`
-listens on all interfaces, turn it on before exposing the app to a network. The
-filesystem browser reveals directory names across the machine, so this matters.
+listens on all interfaces, turn it on before exposing the app beyond a trusted
+LAN. The filesystem browser reveals directory names across the machine, so this
+matters.
 
 Enable it (run from `backend/`):
 
@@ -75,11 +80,13 @@ code plus a manual key. Scan it with Google Authenticator, Authy, 1Password, etc
 Restart the server afterwards.
 
 - **Login** requires username + password + the current 6-digit code. A code
-  cannot be reused; five failures from one IP triggers a 5-minute lockout.
+  cannot be reused; five failures — counted per source address *and* per
+  username — trigger a 5-minute lockout. Set `GAMECRC_TRUST_PROXY=1` if the app
+  runs behind a reverse proxy so the throttle keys on `X-Forwarded-For`.
 - Sessions are stateless HMAC-signed bearer tokens, valid 12 hours, held in the
   browser's `localStorage`.
-- Config lives in `backend/data/auth.json` (mode `600`), separate from the main
-  database.
+- Config lives in `backend/data/auth.json` (written `0600`), separate from the
+  main database.
 
 Other commands:
 
@@ -107,7 +114,7 @@ location with the `GAMECRC_DATA_DIR` environment variable (also moves
 | GET | `/api/health` | Liveness check (never requires auth) |
 | GET | `/api/auth/status` | Whether auth is enabled and the token is valid |
 | POST | `/api/auth/login` | `{"username", "password", "code"}` → `{"token"}` |
-| GET | `/api/fs/list?path=` | List subdirectories (drives when `path` omitted) |
+| GET | `/api/fs/list?path=` | List subdirectories (the `/` root when `path` omitted) |
 | GET | `/api/libraries` | Libraries with scan summaries |
 | POST | `/api/libraries` | Add a library (`{"path": "..."}`) |
 | DELETE | `/api/libraries/{id}` | Remove a library and its results |
@@ -119,3 +126,6 @@ location with the `GAMECRC_DATA_DIR` environment variable (also moves
 When auth is enabled, every `/api` route except `health`, `auth/status`, and
 `auth/login` needs an `Authorization: Bearer <token>` header. One scan runs at a
 time.
+
+See [docs/SPEC.md](docs/SPEC.md) for the behavioural contract and
+[docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md) for conventions.

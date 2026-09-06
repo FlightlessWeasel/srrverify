@@ -1,19 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, Library, ScanState, token } from "./api";
+import { fmtSize } from "./format";
 import { DirectoryPicker } from "./components/DirectoryPicker";
 import { Login } from "./components/Login";
 import { Results } from "./components/Results";
-
-function fmtSize(n: number): string {
-  const u = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < u.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
-}
 
 export default function App() {
   const [gate, setGate] = useState<"loading" | "login" | "ok">("loading");
@@ -145,7 +135,7 @@ export default function App() {
     <div className="app">
       <header>
         <div className="header-row">
-          <h1>Game CRC Checker</h1>
+          <h1>srrverify</h1>
           {authEnabled && (
             <button className="ghost" onClick={logout}>
               {username ? `Sign out (${username})` : "Sign out"}
@@ -213,7 +203,7 @@ export default function App() {
       {scan && (scanRunning || scan.phase !== "done") && (
         <section className="progress-card">
           <div className="progress-line">
-            <strong>{phaseLabel(scan.phase)}</strong>
+            <strong>{scan.phase_label}</strong>
             <span className="muted">
               {scan.files_done}/{scan.files_total} files ·{" "}
               {fmtSize(scan.bytes_done)} / {fmtSize(scan.bytes_total)}
@@ -241,25 +231,6 @@ export default function App() {
       )}
     </div>
   );
-}
-
-function phaseLabel(phase: string): string {
-  switch (phase) {
-    case "discovering":
-      return "Discovering files";
-    case "releases":
-      return "Looking up releases on srrdb";
-    case "hashing":
-      return "Computing CRC32";
-    case "done":
-      return "Scan complete";
-    case "cancelled":
-      return "Scan cancelled";
-    case "error":
-      return "Scan failed";
-    default:
-      return "Starting";
-  }
 }
 
 function SummaryChips({ lib }: { lib: Library }) {
