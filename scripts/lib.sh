@@ -59,10 +59,39 @@ download_release() {
 # ensure_venv <requirements.txt>
 #   Create <PREFIX>/venv if absent, then (re)install requirements.
 ensure_venv() {
-  local reqs="$1"
+  local reqs="$1" venv_error venv_status py_version venv_pkg os_id
   if [ ! -x "${PREFIX}/venv/bin/python" ]; then
     log "creating virtualenv at ${PREFIX}/venv"
-    python3 -m venv "${PREFIX}/venv"
+    venv_error="$(mktemp)"
+    if python3 -m venv "${PREFIX}/venv" >"$venv_error" 2>&1; then
+      rm -f "$venv_error"
+    else
+      venv_status=$?
+      os_id="$(. /etc/os-release 2>/dev/null && printf '%s' "${ID:-}")"
+      if { [ "$os_id" = debian ] || [ "$os_id" = ubuntu ]; } \
+        && command -v apt-get >/dev/null 2>&1 \
+        && { grep -Fqi 'ensurepip is not available' "$venv_error" \
+          || grep -Fqi 'No module named ensurepip' "$venv_error"; }; then
+        cat "$venv_error" >&2
+        rm -f "$venv_error"
+        py_version="$(python3 -c 'import sys; print("%s.%s" % sys.version_info[:2])')"
+        venv_pkg="python${py_version}-venv"
+        # The failed venv attempt may have left a partial environment behind.
+        # This branch is reached only when no valid environment existed above.
+        rm -rf -- "${PREFIX}/venv"
+        log "installing ${venv_pkg}"
+        if ! apt-get install -y "$venv_pkg"; then
+          venv_pkg=python3-venv
+          log "falling back to ${venv_pkg}"
+          apt-get install -y "$venv_pkg"
+        fi
+        python3 -m venv "${PREFIX}/venv"
+      else
+        cat "$venv_error" >&2
+        rm -f "$venv_error"
+        return "$venv_status"
+      fi
+    fi
   fi
   "${PREFIX}/venv/bin/pip" install --quiet --upgrade pip
   "${PREFIX}/venv/bin/pip" install --quiet -r "$reqs"
