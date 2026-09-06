@@ -59,7 +59,7 @@ download_release() {
 # ensure_venv <requirements.txt>
 #   Create <PREFIX>/venv if absent, then (re)install requirements.
 ensure_venv() {
-  local reqs="$1" venv_error venv_status py_version venv_pkg os_id
+  local reqs="$1" venv_error venv_error_text venv_status py_version venv_pkg os_id os_like
   if [ ! -x "${PREFIX}/venv/bin/python" ] \
     || ! "${PREFIX}/venv/bin/python" -m pip --version >/dev/null 2>&1; then
     log "creating virtualenv at ${PREFIX}/venv"
@@ -71,11 +71,24 @@ ensure_venv() {
       rm -f "$venv_error"
     else
       venv_status=$?
-      os_id="$(. /etc/os-release 2>/dev/null && printf '%s' "${ID:-}")"
-      if { [ "$os_id" = debian ] || [ "$os_id" = ubuntu ]; } \
+      # Flatten wrapped Python output so the detection also handles messages
+      # split across lines or with wording in either order.
+      venv_error_text="$(tr '\n' ' ' < "$venv_error")"
+      os_id= os_like=
+      if [ -r /etc/os-release ]; then
+        # ID_LIKE covers Debian derivatives which do not identify themselves
+        # directly as Debian or Ubuntu.
+        . /etc/os-release
+        os_id="${ID:-}"
+        os_like="${ID_LIKE:-}"
+      fi
+      if case " $os_id $os_like " in
+           *\ debian\ *|*\ ubuntu\ *) true ;;
+           *) false ;;
+         esac \
         && command -v apt-get >/dev/null 2>&1 \
-        && { grep -Fqi 'ensurepip is not available' "$venv_error" \
-          || grep -Fqi 'No module named ensurepip' "$venv_error"; }; then
+        && { grep -Eiq 'ensurepip' <<<"$venv_error_text" \
+          && grep -Eiq '(not[[:space:]]+available|unavailable|missing|not[[:space:]]+installed|no module named|module not found|virtual[[:space:]]+environment[[:space:]]+was[[:space:]]+not[[:space:]]+created[[:space:]]+successfully)' <<<"$venv_error_text"; }; then
         cat "$venv_error" >&2
         rm -f "$venv_error"
         py_version="$(python3 -c 'import sys; print("%s.%s" % sys.version_info[:2])')"
@@ -84,12 +97,43 @@ ensure_venv() {
         # This branch is reached only when no valid environment existed above.
         rm -rf -- "${PREFIX}/venv"
         log "installing ${venv_pkg}"
-        if ! apt-get install -y "$venv_pkg"; then
-          venv_pkg=python3-venv
-          log "falling back to ${venv_pkg}"
-          apt-get install -y "$venv_pkg"
+        # apt's package lists may be absent or stale in a minimal image.
+        if ! command -v apt-cache >/dev/null 2>&1 \
+          || ! apt-cache show "$venv_pkg" >/dev/null 2>&1; then
+          log "updating apt package metadata"
+          apt-get update || return $?
         fi
-        python3 -m venv "${PREFIX}/venv"
+        if apt-get install -y "$venv_pkg"; then
+          :
+        else
+          venv_status=$?
+          log "updating apt package metadata after ${venv_pkg} installation failure"
+          apt-get update || return $?
+          if apt-get install -y "$venv_pkg"; then
+            :
+          else
+            venv_status=$?
+            venv_pkg=python3-venv
+            log "falling back to ${venv_pkg}"
+            if ! command -v apt-cache >/dev/null 2>&1 \
+              || ! apt-cache show "$venv_pkg" >/dev/null 2>&1; then
+              log "updating apt package metadata"
+              apt-get update || return $?
+            fi
+            if apt-get install -y "$venv_pkg"; then
+              :
+            else
+              venv_status=$?
+              return "$venv_status"
+            fi
+          fi
+        fi
+        if python3 -m venv "${PREFIX}/venv"; then
+          :
+        else
+          venv_status=$?
+          return "$venv_status"
+        fi
       else
         cat "$venv_error" >&2
         rm -f "$venv_error"
