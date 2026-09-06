@@ -33,6 +33,19 @@ frontend/  React + Vite. Library manager, folder picker, progress, results table
 
 ## Run it
 
+### Install on headless Linux
+
+Copy and paste this command on the Linux host. It downloads the installer and
+installs the latest published release as a systemd service under `/opt/srrverify`.
+
+```bash
+tmp="$(mktemp -d)" && trap 'rm -rf "$tmp"' EXIT && curl -fsSL https://raw.githubusercontent.com/FlightlessWeasel/srrverify/master/scripts/install.sh -o "$tmp/install.sh" && curl -fsSL https://raw.githubusercontent.com/FlightlessWeasel/srrverify/master/scripts/lib.sh -o "$tmp/lib.sh" && sudo bash "$tmp/install.sh"
+```
+
+The installer needs `curl`, `tar`, `sha256sum`, `python3`, `systemctl`, and
+`visudo`. See [Deployment and updates](docs/DEPLOYMENT.md) for options and
+updates.
+
 ### 1. Backend
 
 ```bash
