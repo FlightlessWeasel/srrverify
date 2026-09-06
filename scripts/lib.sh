@@ -60,7 +60,8 @@ download_release() {
 #   Create <PREFIX>/venv if absent, then (re)install requirements.
 ensure_venv() {
   local reqs="$1" venv_error venv_status py_version venv_pkg os_id
-  if [ ! -x "${PREFIX}/venv/bin/python" ] || [ ! -x "${PREFIX}/venv/bin/pip" ]; then
+  if [ ! -x "${PREFIX}/venv/bin/python" ] \
+    || ! "${PREFIX}/venv/bin/python" -m pip --version >/dev/null 2>&1; then
     log "creating virtualenv at ${PREFIX}/venv"
     # A venv with only part of its launcher set is not usable. Remove only
     # this incomplete environment before recreating it.
@@ -96,8 +97,8 @@ ensure_venv() {
       fi
     fi
   fi
-  "${PREFIX}/venv/bin/pip" install --quiet --upgrade pip
-  "${PREFIX}/venv/bin/pip" install --quiet -r "$reqs"
+  "${PREFIX}/venv/bin/python" -m pip install --quiet --upgrade pip
+  "${PREFIX}/venv/bin/python" -m pip install --quiet -r "$reqs"
 }
 
 # swap_current <release_dir>  — atomically repoint <PREFIX>/current.
