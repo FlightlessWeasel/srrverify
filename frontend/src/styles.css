@@ -39,6 +39,34 @@ header h1 {
   align-items: center;
   gap: 12px;
 }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.update-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.update-panel .version {
+  color: var(--muted);
+  font-size: 12px;
+}
+.update-panel a {
+  color: var(--accent);
+}
+.chip.update {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+button.small {
+  padding: 5px 10px;
+  font-size: 12px;
+}
 
 .login-wrap {
   min-height: 100vh;

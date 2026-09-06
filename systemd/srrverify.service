@@ -1,0 +1,27 @@
+# Template — scripts/install.sh substitutes @PREFIX@ / @USER@ / @HOST@ / @PORT@
+# and writes the result to /etc/systemd/system/srrverify.service.
+[Unit]
+Description=srrverify — srrdb CRC verification for a library folder
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+WorkingDirectory=@PREFIX@/current/backend
+Environment=GAMECRC_DATA_DIR=@PREFIX@/data
+Environment=GAMECRC_PREFIX=@PREFIX@
+Environment=GAMECRC_HOST=@HOST@
+Environment=GAMECRC_PORT=@PORT@
+ExecStart=@PREFIX@/venv/bin/python run.py
+Restart=on-failure
+RestartSec=2
+
+# Minimal hardening only. The scanner must read arbitrary library paths, and the
+# in-UI update shells out to sudo, so ProtectSystem / NoNewPrivileges / a private
+# filesystem view would all break normal operation.
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

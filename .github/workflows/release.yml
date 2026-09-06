@@ -1,0 +1,54 @@
+name: release
+
+# Push a tag like v1.4.0 to build the tarball and publish a GitHub Release.
+# The running app checks that Release feed and can update itself to it.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble release tree
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          STAGE="srrverify-${VERSION}"
+          mkdir -p "$STAGE/frontend"
+          printf '%s\n' "$VERSION" > "$STAGE/VERSION"
+          cp -r backend "$STAGE/"
+          rm -rf "$STAGE/backend/data" "$STAGE/backend/.venv"
+          find "$STAGE/backend" -name '__pycache__' -type d -prune -exec rm -rf {} +
+          cp -r frontend/dist "$STAGE/frontend/dist"
+          cp -r scripts systemd "$STAGE/"
+          cp crc32-iso.sh README.md docs/DEPLOYMENT.md "$STAGE/"
+          tar -czf "srrverify-${VERSION}.tar.gz" "$STAGE"
+          sha256sum "srrverify-${VERSION}.tar.gz" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            srrverify-*.tar.gz
+            SHA256SUMS
+          generate_release_notes: true
+          fail_on_unmatched_files: true

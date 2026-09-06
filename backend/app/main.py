@@ -10,6 +10,7 @@ from .routers import auth as auth_router
 from .routers import fs as fs_router
 from .routers import libraries as libraries_router
 from .routers import scan as scan_router
+from .routers import update as update_router
 
 app = FastAPI(title="srrverify")
 
@@ -56,6 +57,7 @@ app.include_router(auth_router.router)
 app.include_router(fs_router.router)
 app.include_router(libraries_router.router)
 app.include_router(scan_router.router)
+app.include_router(update_router.router)
 
 
 # --------------------------------------------------------------------------- #

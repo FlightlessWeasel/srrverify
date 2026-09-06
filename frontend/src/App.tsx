@@ -4,6 +4,7 @@ import { fmtSize } from "./format";
 import { DirectoryPicker } from "./components/DirectoryPicker";
 import { Login } from "./components/Login";
 import { Results } from "./components/Results";
+import { UpdatePanel } from "./components/UpdatePanel";
 
 export default function App() {
   const [gate, setGate] = useState<"loading" | "login" | "ok">("loading");
@@ -136,11 +137,14 @@ export default function App() {
       <header>
         <div className="header-row">
           <h1>srrverify</h1>
-          {authEnabled && (
-            <button className="ghost" onClick={logout}>
-              {username ? `Sign out (${username})` : "Sign out"}
-            </button>
-          )}
+          <div className="header-actions">
+            <UpdatePanel />
+            {authEnabled && (
+              <button className="ghost" onClick={logout}>
+                {username ? `Sign out (${username})` : "Sign out"}
+              </button>
+            )}
+          </div>
         </div>
         <p className="muted">
           Verify library files against srrdb.com CRC records.

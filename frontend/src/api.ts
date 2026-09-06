@@ -61,6 +61,23 @@ export interface AuthStatus {
   username?: string | null;
 }
 
+export interface HealthInfo {
+  ok: boolean;
+  version: string;
+}
+
+/** Mirror of backend/app/updater.py `ReleaseInfo.as_dict()`. */
+export interface UpdateStatus {
+  current: string;
+  latest: string | null;
+  update_available: boolean;
+  /** False on a dev checkout: show the version, hide the button. */
+  can_apply: boolean;
+  checked_at: number;
+  notes_url: string | null;
+  error: string | null;
+}
+
 const TOKEN_KEY = "gamecrc_token";
 
 export const token = {
@@ -139,4 +156,12 @@ export const api = {
     request<{ running: boolean; state: ScanState | null }>("/api/scan/current"),
   cancelScan: () =>
     request<unknown>("/api/scan/cancel", { method: "POST" }),
+
+  updateStatus: (refresh = false) =>
+    request<UpdateStatus>(`/api/update/status${refresh ? "?refresh=true" : ""}`),
+  applyUpdate: () =>
+    request<{ started: boolean; target: string }>("/api/update/apply", {
+      method: "POST",
+    }),
+  health: () => request<HealthInfo>("/api/health"),
 };

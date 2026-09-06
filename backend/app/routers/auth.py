@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from .. import auth
 from ..config import API_PREFIX
+from ..version import __version__
 
 router = APIRouter(prefix=API_PREFIX)
 
@@ -16,7 +17,8 @@ class LoginIn(BaseModel):
 
 @router.get("/health")
 def health() -> dict:
-    return {"ok": True}
+    # `version` lets the updater's post-restart health check confirm the swap.
+    return {"ok": True, "version": __version__}
 
 
 @router.get("/auth/status")

@@ -127,5 +127,17 @@ When auth is enabled, every `/api` route except `health`, `auth/status`, and
 `auth/login` needs an `Authorization: Bearer <token>` header. One scan runs at a
 time.
 
+## Deployment and updates
+
+For a persistent install, run it as a systemd service with
+[`scripts/install.sh`](scripts/install.sh) — it unpacks a GitHub Release
+tarball under `/opt/srrverify`, wires up the unit, and grants the service user
+one passwordless command to update itself. After that the header shows the
+running version and offers an **Install vX.Y.Z** button when a newer release
+exists; `sudo /opt/srrverify/bin/update.sh` does the same from the shell, with
+`--rollback` to go back. CI publishes a Release on every `v*` tag push.
+
+Full details: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 See [docs/SPEC.md](docs/SPEC.md) for the behavioural contract and
 [docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md) for conventions.
