@@ -29,9 +29,28 @@ done
 [ "$(id -u)" -eq 0 ] || { echo "run as root (sudo)" >&2; exit 1; }
 
 export PREFIX
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
+LIB_TMP=""
+if [ -n "$SCRIPT_SOURCE" ] && [ -f "$SCRIPT_SOURCE" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+  LIB_PATH="${SCRIPT_DIR}/lib.sh"
+elif [ -f "scripts/lib.sh" ]; then
+  SCRIPT_DIR="$(cd scripts && pwd)"
+  LIB_PATH="${SCRIPT_DIR}/lib.sh"
+else
+  command -v curl >/dev/null 2>&1 || {
+    printf '[srrverify] error: missing required command: curl\n' >&2
+    exit 1
+  }
+  LIB_TMP="$(mktemp)"
+  trap 'rm -f "$LIB_TMP"' EXIT
+  LIB_PATH="$LIB_TMP"
+  curl -fsSL \
+    "https://raw.githubusercontent.com/${GAMECRC_REPO:-FlightlessWeasel/srrverify}/master/scripts/lib.sh" \
+    -o "$LIB_PATH"
+fi
 # shellcheck source=scripts/lib.sh
-. "${SCRIPT_DIR}/lib.sh"
+. "$LIB_PATH"
 
 need curl
 need tar

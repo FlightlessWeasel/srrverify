@@ -39,7 +39,7 @@ Copy and paste this command on the Linux host. It downloads the installer and
 installs the latest published release as a systemd service under `/opt/srrverify`.
 
 ```bash
-tmp="$(mktemp -d)" && trap 'rm -rf "$tmp"' EXIT && curl -fsSL https://raw.githubusercontent.com/FlightlessWeasel/srrverify/v0.0.5/scripts/install.sh -o "$tmp/install.sh" && curl -fsSL https://raw.githubusercontent.com/FlightlessWeasel/srrverify/v0.0.5/scripts/lib.sh -o "$tmp/lib.sh" && sudo bash "$tmp/install.sh"
+curl -fsSL https://raw.githubusercontent.com/FlightlessWeasel/srrverify/master/scripts/install.sh | sudo bash
 ```
 
 The installer needs `curl`, `tar`, `sha256sum`, `python3`, `systemctl`, and
