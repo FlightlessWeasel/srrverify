@@ -1,4 +1,5 @@
 # Shared helpers for install.sh / update.sh. Source this, do not execute it.
+# shellcheck shell=bash
 #
 # Expects in the environment:
 #   PREFIX          install root (e.g. /opt/srrverify)
@@ -78,6 +79,7 @@ swap_current() {
 prune_releases() {
   local keep="$1" live
   live="$(readlink -f "${PREFIX}/current" 2>/dev/null || true)"
+  # shellcheck disable=SC2012  # release dir names are tags; sorting by mtime needs ls
   ls -1dt "${PREFIX}"/releases/*/ 2>/dev/null | tail -n +"$((keep + 1))" |
     while read -r d; do
       [ "$(readlink -f "$d")" = "$live" ] && continue

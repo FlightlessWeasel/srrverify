@@ -112,12 +112,12 @@ own_current() { chown -h "${svc_user}:${svc_user}" "${PREFIX}/current" 2>/dev/nu
 #   poll /api/health for up to 30s. With a version, the reported `version` must
 #   match; without one, HTTP 200 is enough.
 activate() {
-  local dir="$1" want="$2" body i
+  local dir="$1" want="$2" body
   ensure_venv "${dir}/backend/requirements.txt"
   swap_current "$dir"
   own_current
   systemctl restart srrverify.service
-  for i in $(seq 1 30); do
+  for _ in $(seq 1 30); do
     sleep 1
     body="$(curl -fsS --max-time 3 "$HEALTH_URL" 2>/dev/null || true)"
     [ -n "$body" ] || continue
@@ -130,6 +130,7 @@ activate() {
 }
 
 if [ "$ROLLBACK" -eq 1 ]; then
+  # shellcheck disable=SC2012  # release dir names are tags; sorting by mtime needs ls
   prev="$(ls -1dt "${PREFIX}"/releases/*/ 2>/dev/null |
     sed 's#/$##' | grep -vxF "$current_target" | head -1 || true)"
   [ -n "$prev" ] || die "no previous release to roll back to"
