@@ -1,0 +1,121 @@
+# Game CRC Checker
+
+Web app that scans a library folder, computes CRC32 for every file, and checks
+each one against the CRC records on [srrdb.com](https://www.srrdb.com). Results
+are cached in a local SQLite database so a folder is only hashed once.
+
+Built around `crc32-iso.sh`, which does the same check for `.iso` files from the
+command line.
+
+## How it works
+
+- A **library** is a folder you point the app at.
+- A **scan** walks the whole tree. Files are grouped by their immediate parent
+  folder name, which is used as the scene release name for the srrdb lookup
+  (`https://api.srrdb.com/v1/details/<release>`).
+- For each file: CRC32 is computed by streaming, matched to the release's file
+  list by name (with a size fallback for single-ISO archives), and compared.
+- Status per file: `MATCH`, `MISMATCH`, `NOT_FOUND` (no srrdb record), `ERROR`
+  (file could not be read).
+- On the next scan, files whose size and mtime are unchanged keep their stored
+  CRC. srrdb responses are cached too. **Full rescan** ignores both caches.
+
+## Layout
+
+```
+backend/   FastAPI + SQLite. Scanning, CRC, srrdb client.
+frontend/  React + Vite. Library manager, folder picker, progress, results table.
+```
+
+## Run it
+
+### 1. Backend
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate        # Windows;  source .venv/bin/activate on macOS/Linux
+pip install -r requirements.txt
+python run.py                  # serves http://0.0.0.0:8000 (all interfaces)
+```
+
+`run.py` binds `0.0.0.0:8000`. Override with `GAMECRC_HOST` (e.g. `127.0.0.1`)
+and `GAMECRC_PORT`.
+
+### 2. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev                    # http://localhost:5173, proxies /api to :8000
+```
+
+Open http://localhost:5173.
+
+### Single-process option
+
+`npm run build` writes `frontend/dist/`. When that exists, the backend serves the
+UI itself on port 8000 — no Vite process needed. This is the mode to use when
+reaching the app from another machine.
+
+## Authentication (optional, with MFA)
+
+Auth is **off by default** — the app serves with no login. Because `run.py`
+listens on all interfaces, turn it on before exposing the app to a network. The
+filesystem browser reveals directory names across the machine, so this matters.
+
+Enable it (run from `backend/`):
+
+```bash
+python -m app.auth_setup
+```
+
+It prompts for a username and password, generates a TOTP secret, and prints a QR
+code plus a manual key. Scan it with Google Authenticator, Authy, 1Password, etc.
+Restart the server afterwards.
+
+- **Login** requires username + password + the current 6-digit code. A code
+  cannot be reused; five failures from one IP triggers a 5-minute lockout.
+- Sessions are stateless HMAC-signed bearer tokens, valid 12 hours, held in the
+  browser's `localStorage`.
+- Config lives in `backend/data/auth.json` (mode `600`), separate from the main
+  database.
+
+Other commands:
+
+```bash
+python -m app.auth_setup --show      # reprint the QR / otpauth URI
+python -m app.auth_setup --disable   # back to no login
+```
+
+Headless setup (no prompts): set `GAMECRC_SETUP_USER` and
+`GAMECRC_SETUP_PASSWORD` before running `python -m app.auth_setup`.
+
+Password hashing is `scrypt`; TOTP is RFC 6238 (SHA-1, 6 digits, 30s). Both are
+implemented on the standard library — no crypto dependency.
+
+## Data
+
+SQLite file at `backend/data/gamecrc.db`. Delete it to reset. Override the
+location with the `GAMECRC_DATA_DIR` environment variable (also moves
+`auth.json`).
+
+## API
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/health` | Liveness check (never requires auth) |
+| GET | `/api/auth/status` | Whether auth is enabled and the token is valid |
+| POST | `/api/auth/login` | `{"username", "password", "code"}` → `{"token"}` |
+| GET | `/api/fs/list?path=` | List subdirectories (drives when `path` omitted) |
+| GET | `/api/libraries` | Libraries with scan summaries |
+| POST | `/api/libraries` | Add a library (`{"path": "..."}`) |
+| DELETE | `/api/libraries/{id}` | Remove a library and its results |
+| GET | `/api/libraries/{id}/files` | Results, filterable by `status` and `search` |
+| POST | `/api/libraries/{id}/scan` | Start a scan (`{"force": bool}`) |
+| GET | `/api/scan/current` | Progress of the running scan |
+| POST | `/api/scan/cancel` | Cancel it |
+
+When auth is enabled, every `/api` route except `health`, `auth/status`, and
+`auth/login` needs an `Authorization: Bearer <token>` header. One scan runs at a
+time.
