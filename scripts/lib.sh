@@ -74,10 +74,11 @@ ensure_venv() {
       # Flatten wrapped Python output so the detection also handles messages
       # split across lines or with wording in either order.
       venv_error_text="$(tr '\n' ' ' < "$venv_error")"
-      os_id= os_like=
+      os_id='' os_like=''
       if [ -r /etc/os-release ]; then
         # ID_LIKE covers Debian derivatives which do not identify themselves
         # directly as Debian or Ubuntu.
+        # shellcheck source=/dev/null
         . /etc/os-release
         os_id="${ID:-}"
         os_like="${ID_LIKE:-}"
