@@ -43,7 +43,7 @@ download_release() {
   trap 'rm -rf "$tmp"' RETURN
 
   log "downloading ${tag}"
-  gh_curl "${DL}/${tag}/srrverify-${ver}.tar.gz" -o "${tmp}/app.tar.gz"
+  gh_curl "${DL}/${tag}/srrverify-${ver}.tar.gz" -o "${tmp}/srrverify-${ver}.tar.gz"
   gh_curl "${DL}/${tag}/SHA256SUMS" -o "${tmp}/SHA256SUMS"
 
   (
@@ -52,7 +52,7 @@ download_release() {
   ) || die "checksum mismatch for srrverify-${ver}.tar.gz"
 
   mkdir -p "$dest"
-  tar -xzf "${tmp}/app.tar.gz" -C "$dest" --strip-components=1
+  tar -xzf "${tmp}/srrverify-${ver}.tar.gz" -C "$dest" --strip-components=1
   log "extracted ${tag} to ${dest}"
 }
 
